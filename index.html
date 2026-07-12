@@ -7,35 +7,4 @@
   <title>Joe Baseball</title>
   <style>
     html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f1f5f9}
-    iframe{display:block;width:100%;height:100dvh;border:0;background:#f1f5f9}
-  </style>
-</head>
-<body>
-  <iframe id="app" title="Joe Baseball" src="app-v2.html?v=12"></iframe>
-  <script>
-    const frame=document.getElementById('app');
-    frame.addEventListener('load',()=>{
-      try{
-        const doc=frame.contentDocument;
-        const loadScript=(src)=>new Promise((resolve,reject)=>{
-          const script=doc.createElement('script');
-          script.src=src;
-          script.onload=resolve;
-          script.onerror=reject;
-          doc.body.appendChild(script);
-        });
-
-        loadScript('workflow-migration.js?v=12')
-          .then(()=>loadScript('score-fix.js?v=12'))
-          .then(()=>loadScript('development-workflow.js?v=12'))
-          .then(()=>{
-            if(typeof frame.contentWindow.renderAll==='function') frame.contentWindow.renderAll();
-          })
-          .catch(error=>console.error('Joe Baseball enhancement failed to load',error));
-      }catch(error){
-        console.error('Joe Baseball enhancement failed to load',error);
-      }
-    });
-  </script>
-</body>
-</html>
+    #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:#f1f5f9;color:#0f172a;font-family:
