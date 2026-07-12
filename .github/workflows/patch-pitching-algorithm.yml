@@ -1,0 +1,24 @@
+name: Patch pitching algorithm
+
+on:
+  push:
+    paths:
+      - .github/workflows/patch-pitching-algorithm.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch pitching algorithm in app source
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('app-v3.html')
+          text = path.read_text()
+
+          old_pitch = "if((x.ip||0)>0){pitch=clamp(75-12*(x.pbb||0)-8*(x
