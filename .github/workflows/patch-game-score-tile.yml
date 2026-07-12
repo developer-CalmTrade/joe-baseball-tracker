@@ -1,0 +1,46 @@
+name: Patch game score tile
+
+on:
+  push:
+    paths:
+      - .github/workflows/patch-game-score-tile.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch dashboard tile reference
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('app-v3.html')
+          text = path.read_text()
+          old = "gameScore.textContent=s.game;gameGrade.textContent=grade(s.game);"
+          new = "document.getElementById('gameScore').textContent=s.game;document.getElementById('gameGrade').textContent=grade(s.game);"
+
+          if old not in text:
+              raise SystemExit('Expected dashboard score reference was not found')
+
+          updated = text.replace(old, new, 1)
+          path.write_text(updated)
+
+      - name: Verify patch
+        shell: python
+        run: |
+          from pathlib import Path
+          text = Path('app-v3.html').read_text()
+          assert "document.getElementById('gameScore').textContent=s.game" in text
+          assert "gameScore.textContent=s.game" not in text
+
+      - name: Commit source fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app-v3.html
+          git commit -m "Fix dashboard game performance tile"
+          git push
