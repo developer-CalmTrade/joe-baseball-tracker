@@ -11,15 +11,30 @@
   </style>
 </head>
 <body>
-  <iframe id="app" title="Joe Baseball" src="app-v2.html?v=11"></iframe>
+  <iframe id="app" title="Joe Baseball" src="app-v2.html?v=12"></iframe>
   <script>
     const frame=document.getElementById('app');
     frame.addEventListener('load',()=>{
       try{
-        const script=frame.contentDocument.createElement('script');
-        script.src='score-fix.js?v=11';
-        frame.contentDocument.body.appendChild(script);
-      }catch(error){console.error('Scoring update failed to load',error)}
+        const doc=frame.contentDocument;
+        const loadScript=(src)=>new Promise((resolve,reject)=>{
+          const script=doc.createElement('script');
+          script.src=src;
+          script.onload=resolve;
+          script.onerror=reject;
+          doc.body.appendChild(script);
+        });
+
+        loadScript('workflow-migration.js?v=12')
+          .then(()=>loadScript('score-fix.js?v=12'))
+          .then(()=>loadScript('development-workflow.js?v=12'))
+          .then(()=>{
+            if(typeof frame.contentWindow.renderAll==='function') frame.contentWindow.renderAll();
+          })
+          .catch(error=>console.error('Joe Baseball enhancement failed to load',error));
+      }catch(error){
+        console.error('Joe Baseball enhancement failed to load',error);
+      }
     });
   </script>
 </body>
