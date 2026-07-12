@@ -9,11 +9,12 @@
 <style>html,body,#app{margin:0;width:100%;height:100%;border:0;overflow:hidden;background:#f1f5f9}</style>
 </head>
 <body>
-<iframe id="app" title="Joe Baseball" src="app-v3.html?build=batting-tiles-20260712-3"></iframe>
+<iframe id="app" title="Joe Baseball" src="app-v3.html?build=update-game-stats-20260712-1"></iframe>
 <script>
 const frame=document.getElementById('app');
 frame.addEventListener('load',()=>{
   const win=frame.contentWindow,doc=frame.contentDocument;
+  let editingGameId=null;
 
   function metric(label){
     const metrics=doc.getElementById('battingMetrics');
@@ -70,11 +71,127 @@ frame.addEventListener('load',()=>{
     addHomeRunTile(t);
   }
 
-  const metrics=doc.getElementById('battingMetrics');
-  if(metrics){
-    new MutationObserver(addBattingTiles).observe(metrics,{childList:true});
-    addBattingTiles();
+  function field(label,id,type='number',extra=''){
+    return `<div><label>${label}</label><input id="${id}" type="${type}" ${extra}></div>`;
   }
+
+  function buildGameEditor(){
+    if(doc.getElementById('game-edit'))return;
+    const page=doc.createElement('section');
+    page.id='game-edit';
+    page.className='page';
+    page.innerHTML=`<div class="card">
+      <h2 id="editGameTitle">Update Game Stats</h2>
+      <div class="grid">
+        ${field('Date','editGameDate','date','required')}
+        ${field('Opponent','editGameOpponent','text','required')}
+        ${field('Final Score','editGameScore','text','placeholder="11-6"')}
+        <div><label>Result</label><select id="editGameResult"><option>Win</option><option>Loss</option><option>Tie</option></select></div>
+      </div>
+      <h3 class="sub">Batting</h3>
+      <div class="grid">
+        ${field('PA','editGamePA')}${field('AB','editGameAB')}${field('1B','editGame1B')}${field('2B','editGame2B')}${field('3B','editGame3B')}${field('HR','editGameHR')}${field('BB','editGameBB')}${field('SO','editGameSO')}${field('RBI','editGameRBI')}${field('Runs','editGameRuns')}${field('SB','editGameSB')}
+      </div>
+      <h3 class="sub">Pitching</h3>
+      <div class="grid">
+        ${field('Innings Pitched','editGameIP','number','step="0.1"')}${field('Pitch Count','editGamePC')}${field('Hits Allowed','editGamePH')}${field('Strikeouts','editGameK')}${field('Walks Allowed','editGamePBB')}${field('Earned Runs','editGameER')}
+      </div>
+      <h3 class="sub">Fielding</h3>
+      <div class="grid">
+        ${field('Total Chances','editGameTC')}${field('Putouts','editGamePO')}${field('Assists','editGameA')}${field('Errors','editGameE')}
+      </div>
+      <label>Notes</label><textarea id="editGameNotes"></textarea>
+      <div class="actions"><button id="saveGameStats" class="btn green" type="button">Save Updated Stats</button><button id="cancelGameStats" class="btn gray" type="button">Cancel</button></div>
+    </div>`;
+    doc.querySelector('main').appendChild(page);
+    doc.getElementById('saveGameStats').onclick=saveGameStats;
+    doc.getElementById('cancelGameStats').onclick=()=>win.show('stats');
+  }
+
+  function setValue(id,value){
+    const input=doc.getElementById(id);
+    if(input)input.value=value??0;
+  }
+
+  function numberValue(id){
+    return Number(doc.getElementById(id)?.value||0);
+  }
+
+  function textValue(id){
+    return (doc.getElementById(id)?.value||'').trim();
+  }
+
+  function openGameEditor(gameId){
+    const game=win.games().find(item=>String(item.id)===String(gameId));
+    if(!game)return;
+    editingGameId=game.id;
+    const singles=Math.max(0,Number(game.h||0)-Number(game.b2||0)-Number(game.b3||0)-Number(game.hr||0));
+    const values={
+      editGameDate:game.date||'',editGameOpponent:game.opponent||'',editGameScore:game.score||'',editGameResult:game.result||'Win',
+      editGamePA:game.pa||0,editGameAB:game.ab||0,editGame1B:singles,editGame2B:game.b2||0,editGame3B:game.b3||0,editGameHR:game.hr||0,
+      editGameBB:game.bb||0,editGameSO:game.so||0,editGameRBI:game.rbi||0,editGameRuns:game.runs||0,editGameSB:game.sb||0,
+      editGameIP:game.ip||0,editGamePC:game.pc||0,editGamePH:game.ph||0,editGameK:game.k||0,editGamePBB:game.pbb||0,editGameER:game.er||0,
+      editGameTC:game.tc||0,editGamePO:game.po||0,editGameA:game.a||0,editGameE:game.e||0,editGameNotes:game.notes||''
+    };
+    Object.entries(values).forEach(([id,value])=>setValue(id,value));
+    doc.getElementById('editGameTitle').textContent=`Update Game Stats - ${game.date} vs. ${game.opponent}`;
+    win.show('game-edit');
+  }
+
+  function saveGameStats(){
+    const date=textValue('editGameDate'),opponent=textValue('editGameOpponent');
+    if(!date||!opponent){win.alert('Date and opponent are required.');return;}
+    const games=win.games();
+    const current=games.find(item=>String(item.id)===String(editingGameId));
+    if(!current)return;
+    const b1=numberValue('editGame1B'),b2=numberValue('editGame2B'),b3=numberValue('editGame3B'),hr=numberValue('editGameHR');
+    const updated={...current,
+      date,opponent,result:textValue('editGameResult'),score:textValue('editGameScore'),
+      pa:numberValue('editGamePA'),ab:numberValue('editGameAB'),h:b1+b2+b3+hr,b2,b3,hr,
+      bb:numberValue('editGameBB'),so:numberValue('editGameSO'),rbi:numberValue('editGameRBI'),runs:numberValue('editGameRuns'),sb:numberValue('editGameSB'),
+      ip:numberValue('editGameIP'),pc:numberValue('editGamePC'),ph:numberValue('editGamePH'),k:numberValue('editGameK'),pbb:numberValue('editGamePBB'),er:numberValue('editGameER'),
+      tc:numberValue('editGameTC'),po:numberValue('editGamePO'),a:numberValue('editGameA'),e:numberValue('editGameE'),notes:textValue('editGameNotes')
+    };
+    const updatedGames=games.map(item=>String(item.id)===String(editingGameId)?updated:item).sort((a,b)=>a.date.localeCompare(b.date));
+    win.localStorage.setItem('joeGames_v4',JSON.stringify(updatedGames));
+    if(updated.scheduleId){
+      let attendance={};
+      try{attendance=JSON.parse(win.localStorage.getItem('joeAttendance_v4')||'{}')}catch{}
+      attendance[updated.scheduleId]={...(attendance[updated.scheduleId]||{}),status:'Attended',played:true,pitched:updated.ip>0,pitches:updated.pc,result:updated.result,score:updated.score};
+      win.localStorage.setItem('joeAttendance_v4',JSON.stringify(attendance));
+    }
+    win.renderAll();
+    win.show('stats');
+    win.alert('Game stats updated.');
+  }
+
+  function addUpdateButtons(){
+    const list=doc.getElementById('gameList');
+    if(!list||typeof win.games!=='function')return;
+    const games=win.games();
+    const rows=[...list.querySelectorAll(':scope > .row')];
+    rows.forEach((row,index)=>{
+      const game=games[index];
+      if(!game||row.querySelector('[data-update-game]'))return;
+      const left=row.firstElementChild;
+      const actions=doc.createElement('div');
+      actions.className='actions';
+      const button=doc.createElement('button');
+      button.type='button';
+      button.className='btn green';
+      button.dataset.updateGame=game.id;
+      button.textContent='Update Game Stats';
+      button.onclick=()=>openGameEditor(game.id);
+      actions.appendChild(button);
+      left.appendChild(actions);
+    });
+  }
+
+  buildGameEditor();
+  const battingMetrics=doc.getElementById('battingMetrics');
+  if(battingMetrics){new MutationObserver(addBattingTiles).observe(battingMetrics,{childList:true});addBattingTiles();}
+  const gameList=doc.getElementById('gameList');
+  if(gameList){new MutationObserver(addUpdateButtons).observe(gameList,{childList:true});addUpdateButtons();}
 });
 </script>
 </body>
