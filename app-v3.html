@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Joe Baseball</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f1f5f9;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#0f172a}
+#loading,#error{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:28px;text-align:center;background:#f1f5f9;z-index:10}
+#loading b{font-size:1.25rem}.spinner{width:38px;height:38px;border:4px solid #cbd5e1;border-top-color:#2563eb;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+#error{display:none}#error button{border:0;border-radius:10px;padding:12px 16px;background:#2563eb;color:#fff;font-weight:900}
+iframe{display:block;width:100%;height:100dvh;border:0;background:#f1f5f9;visibility:hidden}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div><b>Loading Joe Baseball</b><span>Preparing scoring, schedule, and development tools…</span></div>
+<div id="error"><h2>Joe Baseball could not finish loading.</h2><p>Please reload the app. Your saved data remains in this browser.</p><button onclick="location.reload()">Reload App</button></div>
+<iframe id="app" title="Joe Baseball" src="app-v2.html?v=13"></iframe>
+<script>
+const frame=document.getElementById('app');
+const loading=document.getElementById('loading');
+const error=document.getElementById('error');
+const loadScript=(doc,src)=>new Promise((resolve,reject)=>{const s=doc.createElement('script');s.src=src;s.onload=resolve;s.onerror=reject;doc.body.appendChild(s)});
+const fail=()=>{loading.style.display='none';error.style.display='flex'};
+const timeout=setTimeout(fail,12000);
+frame.addEventListener('load',async()=>{
+  try{
+    const doc=frame.contentDocument;
+    await loadScript(doc,'workflow-migration.js?v=13');
+    await loadScript(doc,'score-fix.js?v=13');
+    await loadScript(doc,'development-workflow.js?v=13');
+    if(typeof frame.contentWindow.renderAll==='function')frame.contentWindow.renderAll();
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    clearTimeout(timeout);
+    frame.style.visibility='visible';
+    loading.style.display='none';
+  }catch(e){console.error('Joe Baseball v3 load failed',e);clearTimeout(timeout);fail()}
+});
+</script>
+</body>
+</html>
