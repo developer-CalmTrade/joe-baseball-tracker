@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>9-Hole Command</title>
+<style>
+:root{--navy:#0f172a;--blue:#2563eb;--green:#15803d;--red:#b91c1c;--orange:#c2410c;--bg:#f1f5f9;--line:#cbd5e1;--muted:#64748b}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--navy)}
+header{position:sticky;top:0;z-index:10;padding:16px;background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff}.wrap{max-width:760px;margin:auto;padding:16px}.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 5px 18px #0f172a12}.small{color:var(--muted);font-size:.9rem}.zone{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}.pocket{border:2px solid #94a3b8;border-radius:14px;background:#eff6ff;min-height:132px;padding:10px;display:flex;flex-direction:column;justify-content:space-between;text-align:center;touch-action:manipulation}.pocket.target{border-color:#2563eb;background:#dbeafe}.pocket.hit{border-color:#15803d;background:#dcfce7}.num{font-size:1.9rem;font-weight:900}.counts{font-size:.9rem}.controls{display:grid;grid-template-columns:1fr 1fr;gap:7px}.controls button,.btn{border:0;border-radius:10px;padding:11px;font-weight:900;color:#fff}.attempt{background:#475569}.hitbtn{background:#15803d}.undo{background:#c2410c}.reset{background:#b91c1c}.save{background:#2563eb}.back{background:#475569}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.stat{background:#eff6ff;border-radius:14px;padding:14px}.stat b{display:block;font-size:1.6rem}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions .btn{flex:1;min-width:130px}input{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font:inherit}@media(min-width:620px){.stats{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<header><strong>Joe Baseball — 9-Hole Command</strong><div class="small" style="color:#dbeafe">Call the pocket before every pitch.</div></header>
+<div class="wrap">
+<div class="card"><h2 style="margin-top:0">Interactive Strike Zone</h2><p class="small">Tap <b>Attempt</b> after every called pitch. Tap <b>Hit</b> only when the ball goes through the called pocket. Each pocket tracks its own count.</p><label><b>Target pockets for this round</b></label><input id="targets" placeholder="Example: 1, 3, 7, 9" oninput="markTargets()"><div id="zone" class="zone"></div></div>
+<div class="card"><h2 style="margin-top:0">Session Totals</h2><div class="stats"><div class="stat"><b id="totalPitches">0</b><span class="small">Total Pitches</span></div><div class="stat"><b id="totalHits">0</b><span class="small">Called-Pocket Hits</span></div><div class="stat"><b id="accuracy">0%</b><span class="small">Command Accuracy</span></div><div class="stat"><b id="bestPocket">—</b><span class="small">Best Pocket</span></div></div></div>
+<div class="card"><h2 style="margin-top:0">How to use it</h2><ol><li>Choose the pockets Joe is targeting.</li><li>Joe calls a pocket before the pitch.</li><li>Tap <b>Attempt</b> on that pocket.</li><li>If he hits the called pocket, also tap <b>Hit</b>.</li><li>Use Undo for the last action or reset when starting a new round.</li></ol><div class="actions"><button class="btn undo" onclick="undoLast()">Undo Last</button><button class="btn reset" onclick="resetBoard()">Reset Board</button><button class="btn save" onclick="saveSession()">Save Session</button><button class="btn back" onclick="location.href='index.html'">Back to App</button></div></div>
+</div>
+<script>
+const state=Array.from({length:9},()=>({attempts:0,hits:0}));const history=[];
+function render(){zone.innerHTML=state.map((p,i)=>`<div class="pocket" id="p${i+1}"><div class="num">${i+1}</div><div class="counts"><b>${p.hits}</b> hits / <b>${p.attempts}</b> attempts</div><div class="controls"><button class="attempt" onclick="addAttempt(${i})">Attempt</button><button class="hitbtn" onclick="addHit(${i})">Hit</button></div></div>`).join('');markTargets();updateTotals()}
+function addAttempt(i){state[i].attempts++;history.push({type:'attempt',i});render()}
+function addHit(i){if(state[i].hits>=state[i].attempts){state[i].attempts++;history.push({type:'both',i})}else{history.push({type:'hit',i})}state[i].hits++;render()}
+function undoLast(){const x=history.pop();if(!x)return;if(x.type==='attempt')state[x.i].attempts--;if(x.type==='hit')state[x.i].hits--;if(x.type==='both'){state[x.i].attempts--;state[x.i].hits--}render()}
+function resetBoard(){if(!confirm('Reset all nine pocket counts?'))return;state.forEach(x=>{x.attempts=0;x.hits=0});history.length=0;render()}
+function markTargets(){const selected=(targets.value.match(/[1-9]/g)||[]).map(Number);state.forEach((p,i)=>{const el=document.getElementById('p'+(i+1));if(!el)return;el.classList.toggle('target',selected.includes(i+1));el.classList.toggle('hit',p.hits>0)})}
+function updateTotals(){const pitches=state.reduce((a,x)=>a+x.attempts,0),hits=state.reduce((a,x)=>a+x.hits,0);totalPitches.textContent=pitches;totalHits.textContent=hits;accuracy.textContent=pitches?Math.round(hits/pitches*100)+'%':'0%';let best=-1,bestRate=-1;state.forEach((x,i)=>{if(x.attempts){const r=x.hits/x.attempts;if(r>bestRate){bestRate=r;best=i+1}}});bestPocket.textContent=best>0?'#'+best:'—'}
+function saveSession(){const pitches=state.reduce((a,x)=>a+x.attempts,0),hits=state.reduce((a,x)=>a+x.hits,0);if(!pitches)return alert('Log at least one pitch first.');const key='joeNineHoleDraft_v1';localStorage.setItem(key,JSON.stringify({date:new Date().toISOString().slice(0,10),targets:targets.value,pitches,hits,pockets:state,accuracy:Math.round(hits/pitches*100)}));alert('9-hole session saved. Return to the app to finish the development log.')}
+render();
+</script>
+</body></html>
