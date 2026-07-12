@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Joe Baseball</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#f1f5f9}
+#app{display:block;width:100%;height:100%;border:0;visibility:hidden}
+#loading{position:fixed;inset:0;display:grid;place-items:center;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#0f172a;background:#f1f5f9}
+</style>
+</head>
+<body>
+<div id="loading">Loading Joe Baseball…</div>
+<iframe id="app" src="app-v3.html?v=6"></iframe>
+<script>
+const frame=document.getElementById('app');
+const loading=document.getElementById('loading');
+frame.addEventListener('load',()=>{
+  const w=frame.contentWindow;
+  const d=frame.contentDocument;
+  try{
+    w.developmentScore=function(){
+      const list=w.sessions();
+      if(!list.length)return 0;
+      const recent=list.slice(-10);
+      const avg=recent.reduce((sum,item)=>sum+w.sessionScore(item),0)/recent.length;
+      const skipped=Object.values(w.statuses()).filter(x=>x.status==='Skipped').length;
+      return w.clamp(avg-Math.min(10,skipped*2));
+    };
+
+    w.seasonBaserunningScore=function(){
+      const z=w.totals();
+      return w.clamp((z.t.sb||0)*12+(z.t.runs||0)*4.5);
+    };
+
+    w.pitchingSeasonScore=function(){
+      const z=w.totals(),t=z.t;
+      if(!(t.ip>0))return null;
+      const era=(t.er*6)/t.ip;
+      const bbPerInning=t.pbb/t.ip;
+      const kbb=t.pbb>0?t.k/t.pbb:t.k;
+      const pitchesPerInning=t.pc/t.ip;
+      const runPrevention=Math.max(0,40-era*4);
+      const control=Math.max(0,25-bbPerInning*20);
+      const strikeouts=Math.min(15,kbb*15);
+      const efficiency=Math.max(0,20-Math.max(0,pitchesPerInning-15)*3);
+      return w.clamp(runPrevention+control+strikeouts+efficiency);
+    };
+
+    const originalGameParts=w.gameParts;
+    w.gameParts=function(x){
+      const p=originalGameParts(x);
+      if((x.ip||0)>0){
+        const era=((x.er||0)*6)/(x.ip||1);
+        const bbPerInning=(x.pbb||0)/(x.ip||1);
+        const kbb=(x.pbb||0)>0?(x.k||0)/(x.pbb||1):(x.k||0);
+        const ppi=(x.pc||0)/(x.ip||1);
+        p.pitch=w.clamp(
+          Math.max(0,40-era*4)+
+          Math.max(0,25-bbPerInning*20)+
+          Math.min(15,kbb*15)+
+          Math.max(0,20-Math.max(0,ppi-15)*3)
+        );
+        p.total=w.clamp(p.hit*.4+(p.field===null?70:p.field)*.2+p.run*.1+p.pitch*.3);
+      }
+      return p;
+    };
+
+    w.scoring=function(){
+      const dev=w.developmentScore();
+      const game=w.gameScore();
+      const carry=w.clamp(100-Math.abs(dev-game));
+      const pdi=w.clamp(dev*.4+game*.4+carry*.2);
+      return{dev,game,carry,pdi};
+    };
+
+    w.renderDashboard=function(){
+      const z=w.totals(),s=w.scoring(),p=w.plan();
+      d.getElementById('dateLabel').textContent=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+      d.getElementById('heroTitle').textContent=p[0];
+      d.getElementById('heroNote').textContent=p[1];
+      d.getElementById('pdiScore').textContent=s.pdi;
+      d.getElementById('pdiGrade').textContent=w.grade(s.pdi);
+      d.getElementById('carryScore').textContent=s.carry+'%';
+      d.getElementById('carryGrade').textContent=w.grade(s.carry);
+      d.getElementById('devScore').textContent=s.dev;
+      d.getElementById('devGrade').textContent=w.grade(s.dev);
+      d.getElementById('gameScore').textContent=s.game;
+      d.getElementById('gameGrade').textContent=w.grade(s.game);
+      d.getElementById('pdiNote').textContent=s.dev<30?'Development score is based only on logged work. Add complete, quality sessions to build it.':s.game>s.dev+15?'Game performance is currently ahead of logged development.':s.dev>s.game+15?'Preparation is ahead of game execution.':'Development and game performance are tracking closely.';
+      d.getElementById('scoreBreakdown').innerHTML=w.component('Development',s.dev)+w.component('Game Performance',s.game)+w.component('Carryover',s.carry);
+      d.getElementById('record').textContent=`${z.w}-${z.l}`;
+      d.getElementById('winPct').textContent=w.fmt(z.w/Math.max(1,z.w+z.l));
+      d.getElementById('gameCount').textContent=z.w+z.l;
+      d.getElementById('recordList').innerHTML=w.games().map(x=>`<div class="row"><div><b>${x.date}</b><div class="small">vs. ${x.opponent}</div></div><div class="${x.result==='Win'?'win':'loss'}">${x.result==='Win'?'W':'L'} ${x.score}</div></div>`).join('');
+    };
+
+    w.renderStats=function(){
+      const z=w.totals(),t=z.t;
+      const era=t.ip?((t.er*6)/t.ip).toFixed(2):'—';
+      const whip=t.ip?((t.h+t.pbb)/t.ip).toFixed(2):'—';
+      const parts=w.games().map(w.gameParts);
+      const avgAll=k=>parts.length?w.clamp(parts.reduce((sum,x)=>sum+x[k],0)/parts.length):0;
+      const fieldParts=parts.filter(x=>x.field!==null);
+      const fieldScore=fieldParts.length?w.clamp(fieldParts.reduce((sum,x)=>sum+x.field,0)/fieldParts.length):0;
+      const runScore=w.seasonBaserunningScore();
+      const pitchScore=w.pitchingSeasonScore();
+      d.getElementById('gameComponentSummary').innerHTML=
+        w.component('Hitting',avgAll('hit'))+
+        w.component('Fielding',fieldScore)+
+        w.component('Baserunning',runScore)+
+        (pitchScore===null?'':w.component('Pitching',pitchScore));
+      const singles=Math.max(0,(t.h||0)-(t.b2||0)-(t.b3||0)-(t.hr||0));
+      d.getElementById('battingMetrics').innerHTML=[
+        ['AVG',w.fmt(z.avg)],['OBP',w.fmt(z.obp)],['SLG',w.fmt(z.slg)],['OPS',w.fmt(z.ops)],
+        ['PA',t.pa],['AB',t.ab],['Hits',t.h],['1B',singles],['2B',t.b2],['BB',t.bb],['SO',t.so],['RBI',t.rbi],['Runs',t.runs],['SB',t.sb]
+      ].map(x=>w.tile(...x)).join('');
+      d.getElementById('pitchingMetrics').innerHTML=[['IP',t.ip],['Pitches',t.pc],['ERA',era],['WHIP',whip],['K',t.k],['BB',t.pbb],['ER',t.er]].map(x=>w.tile(...x)).join('');
+      d.getElementById('fieldingMetrics').innerHTML=[['Fielding %',w.fmt(z.fp)],['Chances',t.tc],['Putouts',t.po],['Assists',t.a],['Errors',t.e]].map(x=>w.tile(...x)).join('');
+      d.getElementById('gameList').innerHTML=w.games().map(x=>{const p=w.gameParts(x);return `<div class="row"><div><b>${x.date} vs. ${x.opponent}</b><div class="small">Hitting ${p.hit} · Fielding ${p.field===null?'N/A':p.field} · Running ${p.run}${p.pitch===null?'':' · Pitching '+p.pitch}</div></div><b>${p.total}</b></div>`}).join('');
+    };
+
+    w.renderAll();
+    frame.style.visibility='visible';
+    loading.style.display='none';
+  }catch(error){
+    console.error(error);
+    frame.style.visibility='visible';
+    loading.style.display='none';
+  }
+});
+</script>
+</body>
+</html>
