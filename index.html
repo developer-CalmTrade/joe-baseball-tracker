@@ -14,22 +14,29 @@
 const frame=document.getElementById('app');
 frame.addEventListener('load',()=>{
   const win=frame.contentWindow,doc=frame.contentDocument;
-  function addOneBaseTile(){
+  function ensureTile(label,value,afterLabel){
+    const metrics=doc.getElementById('battingMetrics');
+    if(!metrics)return;
+    let tile=[...metrics.children].find(node=>node.querySelector('.small')?.textContent.trim()===label);
+    if(!tile){
+      tile=doc.createElement('div');
+      tile.className='metric';
+      const after=[...metrics.children].find(node=>node.querySelector('.small')?.textContent.trim()===afterLabel);
+      if(after)after.insertAdjacentElement('afterend',tile);else metrics.appendChild(tile);
+    }
+    tile.innerHTML=`<b>${value}</b><span class="small">${label}</span>`;
+  }
+  function addExtraBattingTiles(){
     const metrics=doc.getElementById('battingMetrics');
     if(!metrics||typeof win.totals!=='function')return;
     const t=win.totals().t;
     const singles=Math.max(0,Number(t.h||0)-Number(t.b2||0)-Number(t.b3||0)-Number(t.hr||0));
-    let tile=[...metrics.children].find(node=>node.querySelector('.small')?.textContent.trim()==='1B');
-    if(!tile){
-      tile=doc.createElement('div');
-      tile.className='metric';
-      const hits=[...metrics.children].find(node=>node.querySelector('.small')?.textContent.trim()==='Hits');
-      if(hits)hits.insertAdjacentElement('afterend',tile);else metrics.appendChild(tile);
-    }
-    tile.innerHTML=`<b>${singles}</b><span class="small">1B</span>`;
+    ensureTile('1B',singles,'Hits');
+    ensureTile('3B',Number(t.b3||0),'2B');
+    ensureTile('HR',Number(t.hr||0),'3B');
   }
   const metrics=doc.getElementById('battingMetrics');
-  if(metrics){new MutationObserver(addOneBaseTile).observe(metrics,{childList:true});addOneBaseTile();}
+  if(metrics){new MutationObserver(addExtraBattingTiles).observe(metrics,{childList:true});addExtraBattingTiles();}
 });
 </script>
 </body>
